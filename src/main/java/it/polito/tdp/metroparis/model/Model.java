@@ -1,13 +1,21 @@
 package it.polito.tdp.metroparis.model;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.jgrapht.Graph;
 import org.jgrapht.Graphs;
+import org.jgrapht.event.ConnectedComponentTraversalEvent;
+import org.jgrapht.event.EdgeTraversalEvent;
+import org.jgrapht.event.TraversalListener;
+import org.jgrapht.event.VertexTraversalEvent;
 import org.jgrapht.graph.DefaultEdge;
 import org.jgrapht.graph.SimpleDirectedGraph;
+import org.jgrapht.traverse.BreadthFirstIterator;
+import org.jgrapht.traverse.DepthFirstIterator;
+import org.jgrapht.traverse.GraphIterator;
 
 import it.polito.tdp.metroparis.db.MetroDAO;
 
@@ -65,10 +73,100 @@ public class Model {
 		}
 		
 	//	System.out.println(this.graph);
-		System.out.format("Grafo caricato con %d vertici %d archi", this.graph.vertexSet().size(), this.graph.edgeSet().size());
+		System.out.format("Grafo caricato con %d vertici %d archi\n", this.graph.vertexSet().size(), this.graph.edgeSet().size());
+	}
+	
+	/**
+	 * Visita l'intero grafo con strategia Breadth First
+	 * e ritorna l'insieme di vertici incontrati.
+	 * @param source vertice di partenza della visita
+	 * @return insieme di vertici incontrati
+	 */
+	public List<Fermata> visitaAmpiezza(Fermata source) {
+		List<Fermata> visita = new ArrayList<Fermata>();
+		
+		GraphIterator<Fermata, DefaultEdge> bfv = new BreadthFirstIterator<Fermata, DefaultEdge>(graph, source);
+		while(bfv.hasNext()) {
+			visita.add(bfv.next());
+		}
+		return visita;
+	}
+	
+	/**
+	 * Visita l'intero grafo con strategia Depth First
+	 * e ritorna l'insieme di vertici incontrati.
+	 * @param source vertice di partenza della visita
+	 * @return insieme di vertici incontrati
+	 */
+	public List<Fermata> visitaProfondita(Fermata source) {
+		List<Fermata> visita = new ArrayList<Fermata>();
+		
+		GraphIterator<Fermata, DefaultEdge> dfv = new DepthFirstIterator<Fermata, DefaultEdge>(graph, source);
+		while(dfv.hasNext()) {
+			visita.add(dfv.next());
+		}
+		return visita;
+	}
+	/**
+	 * Visita l'intero grafo con strategia Breadth First
+	 * e ritorna una mappa avente come chiave un vertice
+	 * e come valore il padre di quel vertice.
+	 * @param source vertice di partenza della visita
+	 * @return mappa(nodo, padre del nodo)
+	 */
+	public Map<Fermata, Fermata> alberoVisita(Fermata source) {
+		Map<Fermata, Fermata> albero = new HashMap<>();
+		albero.put(source, null);
+		
+		GraphIterator<Fermata, DefaultEdge> bfv = new BreadthFirstIterator<Fermata, DefaultEdge>(graph, source);
+		
+		bfv.addTraversalListener(new TraversalListener<Fermata, DefaultEdge>() {
+			
+			@Override
+			public void vertexTraversed(VertexTraversalEvent<Fermata> e) {}
+			
+			@Override
+			public void vertexFinished(VertexTraversalEvent<Fermata> e) {}
+			
+			@Override
+			public void edgeTraversed(EdgeTraversalEvent<DefaultEdge> e) {
+				// La visita sta considerando un nuovo arco.
+				// Questo arco ha scoperto un nuovo vertice?
+				// Se si', provenendo da dove?
+				DefaultEdge edge = e.getEdge(); // ricevo l'edge (a,b), ho due casi: ho scoperto 'a' partendo da 'b' oppure 'b' da 'a'
+				Fermata a = graph.getEdgeSource(edge);
+				Fermata b = graph.getEdgeTarget(edge);
+				if(albero.containsKey(a)) {
+					albero.put(b, a);
+				}else {
+					albero.put(a, b);
+				}
+			}
+			
+			@Override
+			public void connectedComponentStarted(ConnectedComponentTraversalEvent e) {}
+			
+			@Override
+			public void connectedComponentFinished(ConnectedComponentTraversalEvent e) {}
+		});
+		
+		while(bfv.hasNext()) {
+			bfv.next(); // estrai elemento e ignoralo
+		}
+		
+		return albero;
 	}
 	
 	public static void main(String args[]) {
 		Model m = new Model();
+		List<Fermata> visita1 = m.visitaAmpiezza(m.fermate.get(0));
+		System.out.println(visita1);
+		List<Fermata> visita2 = m.visitaProfondita(m.fermate.get(0));
+		System.out.println(visita2);
+		
+		Map<Fermata, Fermata> albero = m.alberoVisita(m.fermate.get(0));
+		for(Fermata f : albero.keySet()) {
+			System.out.format( "%s -> %s\n", f, albero.get(f));
+		}
 	}
 }
